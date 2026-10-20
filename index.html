@@ -1,0 +1,482 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>PDF → Excel Automático</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f5f7fb;
+      --card: #ffffff;
+      --line: #d9e0ee;
+      --text: #1f2a44;
+      --muted: #5f6b85;
+      --accent: #2f6fed;
+      --accent-soft: #e9f0ff;
+      --ok: #0d9f6e;
+      --warn: #d06a00;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--text);
+      font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+      line-height: 1.4;
+    }
+
+    .container {
+      width: min(1100px, 95vw);
+      margin: 24px auto 40px;
+      display: grid;
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      box-shadow: 0 6px 24px rgba(24, 39, 75, 0.06);
+      padding: 16px;
+    }
+
+    h1 { margin: 0; font-size: clamp(1.3rem, 2.3vw, 2rem); }
+    h2 { margin: 0 0 10px; font-size: 1.1rem; }
+    p { margin: 6px 0; color: var(--muted); }
+
+    .grid {
+      display: grid;
+      gap: 12px;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    input[type="text"], textarea {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 10px 12px;
+      font: inherit;
+      color: inherit;
+      background: #fff;
+    }
+
+    textarea { min-height: 84px; resize: vertical; }
+
+    .drop-zone {
+      border: 2px dashed var(--line);
+      border-radius: 12px;
+      padding: 22px;
+      text-align: center;
+      background: #fafcff;
+      transition: all 0.2s ease;
+      cursor: pointer;
+    }
+
+    .drop-zone.active {
+      border-color: var(--accent);
+      background: var(--accent-soft);
+    }
+
+    .row { display: flex; flex-wrap: wrap; gap: 8px; }
+
+    button {
+      border: none;
+      border-radius: 10px;
+      background: var(--accent);
+      color: #fff;
+      padding: 10px 14px;
+      font: inherit;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    button.secondary {
+      color: var(--accent);
+      background: var(--accent-soft);
+      border: 1px solid #bfcff7;
+    }
+
+    button:disabled { opacity: 0.55; cursor: not-allowed; }
+
+    .status {
+      border-radius: 10px;
+      padding: 10px 12px;
+      background: #eef3ff;
+      border: 1px solid #cfddff;
+      color: #2c4e93;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+    }
+
+    .status.warn {
+      background: #fff4e8;
+      border-color: #ffd1a6;
+      color: var(--warn);
+    }
+
+    .table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: 12px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 700px;
+      background: #fff;
+    }
+
+    th, td {
+      border-bottom: 1px solid #edf1f8;
+      border-right: 1px solid #edf1f8;
+      padding: 8px;
+      text-align: left;
+      vertical-align: top;
+      font-size: 0.93rem;
+    }
+
+    th { background: #f7f9ff; position: sticky; top: 0; z-index: 1; }
+
+    td input {
+      width: 100%;
+      border: 1px solid transparent;
+      background: transparent;
+      padding: 4px;
+      border-radius: 6px;
+      font: inherit;
+      color: inherit;
+    }
+
+    td input:focus {
+      outline: none;
+      border-color: #9db7ff;
+      background: #f4f8ff;
+    }
+
+    .small {
+      font-size: 0.85rem;
+      color: var(--muted);
+    }
+  </style>
+</head>
+<body>
+  <main class="container">
+    <section class="card">
+      <h1>Conversor de PDF para Excel (automático)</h1>
+      <p>Envie um ou vários PDFs, extraia os dados e exporte para uma planilha <strong>.xlsx</strong>. Você pode editar os valores antes de baixar.</p>
+    </section>
+
+    <section class="card grid">
+      <div>
+        <h2>1) Envie os PDFs</h2>
+        <div id="dropZone" class="drop-zone">
+          <p><strong>Clique aqui</strong> ou arraste PDFs para esta área.</p>
+          <p class="small">Suporta múltiplos arquivos ao mesmo tempo.</p>
+          <input id="pdfInput" type="file" accept="application/pdf" multiple hidden />
+        </div>
+        <p id="selectedInfo" class="small">Nenhum arquivo selecionado.</p>
+      </div>
+
+      <div>
+        <h2>2) Campos para extrair</h2>
+        <label for="fieldsInput">Nomes dos campos (1 por linha ou separado por vírgula)</label>
+        <textarea id="fieldsInput" placeholder="Exemplo:
+Nome
+CPF
+Endereço
+Data de Nascimento">Nome
+CPF
+RG
+Endereço
+Telefone
+E-mail
+Data
+Protocolo</textarea>
+        <p class="small">Dica: o app tenta achar padrões como <em>Campo: valor</em> no texto do PDF.</p>
+      </div>
+    </section>
+
+    <section class="card">
+      <div class="row">
+        <button id="extractBtn">Extrair dados</button>
+        <button id="exportBtn" class="secondary" disabled>Exportar Excel (.xlsx)</button>
+        <button id="csvBtn" class="secondary" disabled>Exportar CSV</button>
+      </div>
+      <p id="status" class="status">Pronto para iniciar.</p>
+    </section>
+
+    <section class="card">
+      <h2>3) Pré-visualização (editável)</h2>
+      <div class="table-wrap">
+        <table id="resultTable"></table>
+      </div>
+    </section>
+  </main>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs" type="module"></script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <script type="module">
+    import * as pdfjsLib from 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.mjs';
+
+    pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.mjs';
+
+    const input = document.getElementById('pdfInput');
+    const dropZone = document.getElementById('dropZone');
+    const fieldsInput = document.getElementById('fieldsInput');
+    const extractBtn = document.getElementById('extractBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    const csvBtn = document.getElementById('csvBtn');
+    const statusEl = document.getElementById('status');
+    const selectedInfo = document.getElementById('selectedInfo');
+    const resultTable = document.getElementById('resultTable');
+
+    /** @type {File[]} */
+    let selectedFiles = [];
+    /** @type {Record<string, string>[]} */
+    let tableRows = [];
+
+    const setStatus = (message, tone = 'info') => {
+      statusEl.textContent = message;
+      statusEl.classList.toggle('warn', tone === 'warn');
+    };
+
+    const normalize = (text) =>
+      text
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim()
+        .toLowerCase();
+
+    const readFields = () => {
+      const raw = fieldsInput.value.trim();
+      if (!raw) return [];
+      return [...new Set(raw.split(/[\n,;]+/).map((item) => item.trim()).filter(Boolean))];
+    };
+
+    const updateFileInfo = () => {
+      if (!selectedFiles.length) {
+        selectedInfo.textContent = 'Nenhum arquivo selecionado.';
+        return;
+      }
+      const names = selectedFiles.slice(0, 4).map((f) => f.name).join(', ');
+      const suffix = selectedFiles.length > 4 ? ` +${selectedFiles.length - 4} arquivo(s)` : '';
+      selectedInfo.textContent = `${selectedFiles.length} arquivo(s): ${names}${suffix}`;
+    };
+
+    const setFiles = (files) => {
+      selectedFiles = [...files].filter((f) => f.type === 'application/pdf' || f.name.toLowerCase().endsWith('.pdf'));
+      updateFileInfo();
+      if (!selectedFiles.length) {
+        setStatus('Selecione ao menos um arquivo PDF válido.', 'warn');
+      } else {
+        setStatus('Arquivos carregados. Clique em "Extrair dados".');
+      }
+    };
+
+    input.addEventListener('change', (event) => setFiles(event.target.files));
+
+    dropZone.addEventListener('click', () => input.click());
+    ['dragenter', 'dragover'].forEach((evt) => dropZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropZone.classList.add('active');
+    }));
+
+    ['dragleave', 'drop'].forEach((evt) => dropZone.addEventListener(evt, (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('active');
+    }));
+
+    dropZone.addEventListener('drop', (event) => {
+      const files = event.dataTransfer?.files;
+      if (files?.length) setFiles(files);
+    });
+
+    const extractTextFromPdf = async (file) => {
+      const arrayBuffer = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+      const pages = [];
+
+      for (let pageNum = 1; pageNum <= pdf.numPages; pageNum += 1) {
+        const page = await pdf.getPage(pageNum);
+        const content = await page.getTextContent();
+        const text = content.items
+          .map((item) => ('str' in item ? item.str : ''))
+          .join(' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+        pages.push(text);
+      }
+
+      return pages.join('\n');
+    };
+
+    const buildKeyValueDictionary = (text) => {
+      const dict = {};
+      const lines = text
+        .replace(/\r/g, '\n')
+        .split(/\n+/)
+        .flatMap((line) => line.split(/\s{3,}/))
+        .map((line) => line.trim())
+        .filter(Boolean);
+
+      for (const line of lines) {
+        const pair = line.match(/^([^:]{2,60})\s*[:\-]\s*(.{1,220})$/);
+        if (!pair) continue;
+        dict[normalize(pair[1])] = pair[2].trim();
+      }
+      return dict;
+    };
+
+    const extractFieldValue = (fullText, keyValueDict, field) => {
+      const escaped = field.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const strictPattern = new RegExp(`${escaped}\\s*[:\\-]\\s*(.+?)(?=(\\s+[A-ZÀ-Ú][A-Za-zÀ-ú0-9 ]{2,30}\\s*[:\\-])|$)`, 'i');
+      const strictMatch = fullText.match(strictPattern);
+      if (strictMatch?.[1]) return strictMatch[1].trim();
+
+      const normalizedField = normalize(field);
+      if (keyValueDict[normalizedField]) return keyValueDict[normalizedField];
+
+      const fuzzyEntry = Object.entries(keyValueDict).find(([k]) =>
+        k.includes(normalizedField) || normalizedField.includes(k),
+      );
+
+      return fuzzyEntry?.[1] ?? '';
+    };
+
+    const renderTable = () => {
+      resultTable.innerHTML = '';
+      if (!tableRows.length) {
+        const tr = document.createElement('tr');
+        const td = document.createElement('td');
+        td.textContent = 'Nenhum dado extraído ainda.';
+        td.colSpan = 99;
+        tr.append(td);
+        resultTable.append(tr);
+        exportBtn.disabled = true;
+        csvBtn.disabled = true;
+        return;
+      }
+
+      const headers = Object.keys(tableRows[0]);
+
+      const thead = document.createElement('thead');
+      const htr = document.createElement('tr');
+      headers.forEach((h) => {
+        const th = document.createElement('th');
+        th.textContent = h;
+        htr.append(th);
+      });
+      thead.append(htr);
+
+      const tbody = document.createElement('tbody');
+      tableRows.forEach((row, rowIndex) => {
+        const tr = document.createElement('tr');
+        headers.forEach((header) => {
+          const td = document.createElement('td');
+          const inputCell = document.createElement('input');
+          inputCell.value = row[header] ?? '';
+          inputCell.addEventListener('input', (e) => {
+            tableRows[rowIndex][header] = e.target.value;
+          });
+          td.append(inputCell);
+          tr.append(td);
+        });
+        tbody.append(tr);
+      });
+
+      resultTable.append(thead, tbody);
+      exportBtn.disabled = false;
+      csvBtn.disabled = false;
+    };
+
+    extractBtn.addEventListener('click', async () => {
+      if (!selectedFiles.length) {
+        setStatus('Selecione pelo menos um PDF antes de extrair.', 'warn');
+        return;
+      }
+
+      const fields = readFields();
+      if (!fields.length) {
+        setStatus('Informe ao menos um campo para extração.', 'warn');
+        return;
+      }
+
+      extractBtn.disabled = true;
+      setStatus(`Processando ${selectedFiles.length} arquivo(s)...`);
+
+      try {
+        const rows = [];
+
+        for (let i = 0; i < selectedFiles.length; i += 1) {
+          const file = selectedFiles[i];
+          setStatus(`Lendo ${file.name} (${i + 1}/${selectedFiles.length})...`);
+          const rawText = await extractTextFromPdf(file);
+          const dict = buildKeyValueDictionary(rawText);
+          const row = { _arquivo_pdf: file.name };
+
+          for (const field of fields) {
+            row[field] = extractFieldValue(rawText, dict, field);
+          }
+          rows.push(row);
+        }
+
+        tableRows = rows;
+        renderTable();
+
+        const empties = rows.reduce((count, row) => {
+          const missing = Object.entries(row).filter(([k, v]) => k !== '_arquivo_pdf' && !String(v || '').trim()).length;
+          return count + missing;
+        }, 0);
+
+        const warning = empties > 0
+          ? `\nAviso: ${empties} campo(s) não encontrado(s). Você pode ajustar manualmente na tabela.`
+          : '';
+
+        setStatus(`Extração finalizada com sucesso.${warning}`, empties > 0 ? 'warn' : 'info');
+      } catch (error) {
+        console.error(error);
+        setStatus(`Falha ao processar os PDFs: ${error.message}`, 'warn');
+      } finally {
+        extractBtn.disabled = false;
+      }
+    });
+
+    exportBtn.addEventListener('click', () => {
+      if (!tableRows.length) return;
+      const worksheet = XLSX.utils.json_to_sheet(tableRows);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, 'DadosExtraidos');
+      XLSX.writeFile(workbook, 'dados_extraidos.xlsx');
+      setStatus('Arquivo Excel exportado com sucesso.');
+    });
+
+    csvBtn.addEventListener('click', () => {
+      if (!tableRows.length) return;
+      const worksheet = XLSX.utils.json_to_sheet(tableRows);
+      const csv = XLSX.utils.sheet_to_csv(worksheet);
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'dados_extraidos.csv';
+      a.click();
+      URL.revokeObjectURL(url);
+      setStatus('Arquivo CSV exportado com sucesso.');
+    });
+
+    renderTable();
+  </script>
+</body>
+</html>
